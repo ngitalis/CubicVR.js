@@ -9,6 +9,19 @@
 
 /*globals alert: false */
 
+try {
+  if (!window) {
+    self.window = self;
+    self.document = {};
+    self.fakeWindow = true;
+  }
+}
+catch (e) {
+  self.window = self;
+  self.document = {};
+  self.fakeWindow = true;
+}
+
 (function(window, document, Math, nop, undef) {
 
   /** Global Constants **/
@@ -1150,126 +1163,112 @@
 
   function CubicVR_Worker(settings) {
     this.worker = new Worker(SCRIPT_LOCATION + "CubicVR.js");
-    this.message = settings.message;
-    this.error = settings.error;
+    this.message = settings.message || function () {};
+    this.error = settings.error || function () { log("Error: " + e.message + ": " + e.lineno); };
     this.type = settings.type;
     var that = this;
+
     this.worker.onmessage = function(e) {
-      if (that.message) {
-        that.message(e.data);
-      } //if
+      that.message(e.data);
     };
+
     this.worker.onerror = function(e) {
-      if (that.error) {
-        that.error(e);
-      } else {
-        log("Error: " + e.message + ": " + e.lineno);
-      } //if
+      that.error(e);
     }; //onerror
-    this.fn = function(fn, options) {
-      that.worker.postMessage({
-        message: "function",
-        data: fn,
-        options: options
-      });
-    };
-    this.start = function(options) {
-      that.worker.postMessage({
-        message: "start",
-        data: that.type,
-        options: options
-      });
-    };
+
     this.init = function(data) {
-      that.send({message:'init', data:data});
+      that.send('init', {type: that.type, data: data});
     };
-    this.stop = function() {
+
+    this.send = function(message, data) {
       that.worker.postMessage({
-        message: "stop",
-        data: null
+        message: message,
+        data: data 
       });
     };
-    this.send = function(message) {
-      that.worker.postMessage({
-        message: "data",
-        data: message
-      });
-    };
+
+    if (settings.data || settings.autoStart) {
+      that.init(settings.data);
+    } //if
+
   }; //CubicVR_Worker::Constructor 
 
-  function CubicVR_TestWorker() {
+  function WorkerConnection(options) {
     var that = this;
-    this.onmessage = function(message) {
-      if (message.test) {
-        setTimeout(function(){postMessage(message.test);}, 1000);
-      }
-      else {
-        setTimeout(function(){throw new Error(message);}, 1000);
-      } //if
-    }; //onmessage
-  }; //CubicVR_TestWorker
+    this.message = options.message || function () {};
 
-  function CubicVR_ColladaLoadWorker() {
-    var that = this;
-    this.onmessage = function(message) {
-    }; //onmessage
-  }; //CubicVR_ColladaLoadWorker
+    this.send = function (message, data) {
+      postMessage({message: message, data:data});
+    };
 
-  function CubicVR_WorkerConnection() {
-    this.listener = null;
-  } //CubicVR_WorkerConnection
-  var WorkerConnection = new CubicVR_WorkerConnection();
-
-  if (1) {
-    self.addEventListener('message', function(e) {
-      var message = e.data.message;
-      var type = e.data.data;
-      if (message === "start") {
-        if (type === "test") {
-          WorkerConnection.listener = new CubicVR_TestWorker();
-        }
-        else if (type === "load_collada") {
-          WorkerConnection.listener = new CubicVR_ColladaLoadWorker();
-        }
-        else if (type === "octree") {
-          WorkerConnection.listener = new CubicVR_OctreeWorker();
-        } //if
-      }
-      else if (message === "function") {
-        var data = e.data.data;
-        var options = e.data.options;
-        var parts = data.split('(');
-        if (parts.length > 1 && parts[1].indexOf(')') > -1) {
-          var prefix = parts[0];
-          var suffix = parts[1].substr(0,parts[1].length-1);
-          var args = options || suffix.split(',');
-          var chain = prefix.split('.');
-          var fn = CubicVR;
-          for (var i=0; i<chain.length; ++i) {
-            fn = fn[chain[i]];
-          } //for
-          if (fn && typeof fn === 'function') {
-            var ret = fn.apply(fn, args);
-            postMessage(ret);
-          } //if
-        }
-        else {
-          throw new Error('Worker command not formatted properly.');
-        } //if
-      }
-      else if (message === "data") {
-        if (WorkerConnection.listener !== null) {
-          var data = e.data ? e.data.data : null;
-          WorkerConnection.listener.onmessage(e.data.data);
-        } //if
-      }
-      else if (message === "stop") {
-        if (WorkerConnection.listener !== null && WorkerConnection.listener.stop) {
-          WorkerConnection.listener.stop();
-        } //if
+    self.addEventListener('message', function (e) {
+      if (e.data.message !== 'init') {
+        that.message(e.data);
       } //if
     }, false);
-  } //if
+  }; //WorkerConnection
+
+  function TestWorker(data) {
+    var that = this;
+
+    function message (data) {
+      setTimeout(function() {
+        connection.send("test", data);
+      }, 1000);
+    };
+
+    if (data) {
+      message(data);
+    } //if
+
+    var connection = new WorkerConnection({
+      message: message,
+    });
+  }; //TestWorker
+
+  function PrepareMeshWorker(data) {
+    var that = this,
+        connection;
+
+    function compile(meshData) {
+      var mesh = new Mesh();
+      for (var prop in meshData) {
+        if (meshData.hasOwnProperty(prop)) {
+          mesh[prop] = meshData[prop];
+        } //if
+      } //for
+      var compiled = mesh.triangulateQuads().compileVBO(mesh.compileMap());
+      connection.send("done", compiled);
+    }; //compile
+
+    connection = new WorkerConnection({
+      message: function (data) {
+        compile(data);
+      },
+    });
+
+    if (data) {
+      compile(data);
+    } //if
+  }; //CompileWorker
+
+  var workerMap = {
+    test: TestWorker,
+    prepareMesh: PrepareMeshWorker,
+  };
+
+  self.addEventListener('message', function(e) {
+    var message = e.data.message;
+    if (message === "init") {
+      var type = e.data.data.type;
+      if (type in workerMap) {
+        new workerMap[type](e.data.data.data);
+      }
+      else {
+        throw new Error("Invalid worker type.");
+      } //if
+    } //if
+  }, false);
 
   /* Timer */
 
@@ -2779,7 +2778,6 @@
    
     return compiled;
   }
-
 
   // take a compiled VBO from compileVBO() and create a mesh buffer object for bindBuffer(), fuse with baseBuffer overlay if provided
   Mesh.prototype.bufferVBO = function(VBO,baseBuffer) {
