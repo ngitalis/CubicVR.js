@@ -14,12 +14,18 @@ try {
     self.window = self;
     self.document = {};
     self.fakeWindow = true;
+    self.console = {
+      log: function () {},
+    };
   }
 }
 catch (e) {
   self.window = self;
   self.document = {};
   self.fakeWindow = true;
+  self.console = {
+    log: function () {},
+  };
 }
 
 (function(window, document, Math, nop, undef) {
@@ -808,7 +814,12 @@ catch (e) {
         }
       }
       catch(e) {
-        alert(srcUrl + " failed to load.");
+        try {
+          alert(srcUrl + " failed to load.");
+        }
+        catch(er) {
+          throw new Error(e);
+        }
       }
 
 
@@ -1157,14 +1168,110 @@ catch (e) {
     return shader;
   };
 
-  /*****************************************************************************
-   * Workers
-   *****************************************************************************/
+  function ResourcePool(poolSettings) {
+    var that = this,
+        files = {},
+        managers = {};
+
+    function SceneFileManager (settings) {
+      var parsedFunc = settings.parsed || function () {};
+      var readyFuncs = {};
+      var fileWorker;
+      if (settings.url.match(/\.dae/)) {
+        fileWorker = new CubicVR.Worker({
+          type: "sceneFile",
+          data: settings.url,
+          message: function (message) {
+            if (message.message === "loaded") {
+              var domParser = new DOMParser(),
+                  xml = domParser.parseFromString(message.data, "text/xml"),
+                  clSource = xml2badgerfish(xml);
+              fileWorker.send("parse", clSource);
+            }
+            else if (message.message === "getMesh") {
+              var mesh = new Mesh();
+              for (var prop in message.data.mesh) {
+                if (message.data.mesh.hasOwnProperty(prop)) {
+                  mesh[prop] = message.data.mesh[prop];
+                } //if
+              } //for
+              mesh.bindBuffer(mesh.bufferVBO(message.data.vbo));
+              if (readyFuncs["getMesh"]) {
+                readyFuncs["getMesh"](mesh);
+              } //if
+            }
+            else if (message.message === "parsed") {
+              parsedFunc();
+            } //if
+          },
+        });
+      } //if
+     
+      this.getSceneObject = function (name, readyFunc) {
+        fileWorker.send("getMesh", name);
+        readyFuncs["getMesh"] = readyFunc;
+      };
+
+    };
+
+    this.createSceneFileManager = function (settings) {
+      var manager = new SceneFileManager({
+        url: settings.url,
+        parsed: settings.parsed,
+      });
+      managers[settings.url] = manager;
+      return manager;
+    };
+
+    this.removeSceneFileManager = function (manager) {
+      if (typeof(settings) === "string") {
+        delete managers[settings];
+      }
+      else {
+        for ( var name in managers ) {
+          if (managers[name] = manager) { 
+            delete managers[name];
+          } //if
+        } //for
+      } //if
+    };
+
+    this.loadSceneObject = function (settings) {
+      var scene = settings.scene,
+          mesh = settings.mesh,
+          meshObject = settings.object,
+          options = settings.options;
+
+      var manager = that.createSceneFileManager({
+        url: mesh,
+        parsed: function () {
+          if (meshObject) {
+            manager.getSceneObject(meshObject, function (mesh) {
+              var sceneObject = new SceneObject(mesh);
+              scene.bindSceneObject(sceneObject);
+            });
+          } //if
+        },
+      });
+    };
+
+    this.loadFile = function (filename, callback) {
+      callback = callback || function (data) { files[filename] = data; };
+      var fileWorker = new CubicVR.Worker({
+        type: "file",
+        data: mesh,
+        message: function (message) {
+          callback(message.data);
+        },
+      });
+    };
+
+  };
 
   function CubicVR_Worker(settings) {
     this.worker = new Worker(SCRIPT_LOCATION + "CubicVR.js");
     this.message = settings.message || function () {};
-    this.error = settings.error || function () { log("Error: " + e.message + ": " + e.lineno); };
+    this.error = settings.error || function (e) { log("Error: " + e.message + ": " + e.lineno); };
     this.type = settings.type;
     var that = this;
 
@@ -1191,7 +1298,7 @@ catch (e) {
       that.init(settings.data);
     } //if
 
-  }; //CubicVR_Worker::Constructor 
+  }; //CubicVR_Worker 
 
   function WorkerConnection(options) {
     var that = this;
@@ -1226,6 +1333,66 @@ catch (e) {
     });
   }; //TestWorker
 
+  function FileDataWorker(data) {
+    var that = this,
+        connection;
+
+    function load(filename) {
+      var file = util.getURL(filename);
+      connection.send("done", file.length);
+    };
+
+    connection = new WorkerConnection({
+      message: function (data) {
+        load(data);
+      },
+    });
+
+    if (data) {
+      load(data);
+    } //if
+
+  }; //FileDataWorker
+
+  function SceneFileWorker(data) {
+    var that = this,
+        connection,
+        deferred,
+        filename,
+        scene;
+
+    function load(file) {
+      filename = file;
+      var fileData = util.getURL(file);
+      connection.send("loaded", fileData);
+    };
+
+    connection = new WorkerConnection({
+      message: function (message) {
+        if (message.message === "parse") {
+          deferred = new DeferredBin();
+          scene = cubicvr_loadCollada("", "", deferred, message.data);
+          connection.send("parsed");
+        }
+        else if (message.message === "getMesh") {
+          var mesh = deferred.meshMap[":" + message.data];
+          if (mesh) {
+            var compiled = mesh.triangulateQuads().compileVBO(mesh.compileMap());
+            connection.send("getMesh", {mesh: mesh, vbo: compiled});
+          } //if
+        }
+        else {
+          throw new Error("Not a SceneFileWorker command: " + message.message);
+        } //if
+      },
+    });
+
+    if (data) {
+      load(data);
+    } //if
+
+  }; //SceneFileWorker
+
   function PrepareMeshWorker(data) {
     var that = this,
         connection;
@@ -1255,6 +1422,8 @@ catch (e) {
   var workerMap = {
     test: TestWorker,
     prepareMesh: PrepareMeshWorker,
+    file: FileDataWorker,
+    sceneFile: SceneFileWorker,
   };
 
   self.addEventListener('message', function(e) {
@@ -10529,11 +10698,11 @@ var collada_tools = {
 
 
 
-function cubicvr_parseCollada(meshUrl, prefix, deferred_bin) {
+function cubicvr_parseCollada(meshUrl, prefix, deferred_bin, fileData) {
     //  if (MeshPool[meshUrl] !== undef) return MeshPool[meshUrl];
     var obj = new Mesh();
     var scene = new Scene();
-    var cl = util.getXML(meshUrl);
+    var cl = fileData || util.getXML(meshUrl);
     var tech;
     var sourceId;
     var materialRef, nameRef, nFace, meshName;
@@ -10542,7 +10711,7 @@ function cubicvr_parseCollada(meshUrl, prefix, deferred_bin) {
 
     var i, iCount, iMax, iMod, mCount, mMax, k, kMax, cCount, cMax, sCount, sMax, pCount, pMax, j, jMax;
 
-    var cl_source = xml2badgerfish(cl);
+    var cl_source = fileData || xml2badgerfish(cl);
 
     cl = null;
 
@@ -11660,9 +11829,9 @@ function cubicvr_parseCollada(meshUrl, prefix, deferred_bin) {
 }
 
 
-function cubicvr_loadCollada(meshUrl, prefix, deferred_bin) {
+function cubicvr_loadCollada(meshUrl, prefix, deferred_bin, parsed) {
 
-    var clib = cubicvr_parseCollada(meshUrl, prefix, deferred_bin);
+    var clib = cubicvr_parseCollada(meshUrl, prefix, deferred_bin, parsed);
 
     var up_axis = clib.up_axis;
 
@@ -11678,12 +11847,16 @@ function cubicvr_loadCollada(meshUrl, prefix, deferred_bin) {
 
             var texObj = null;
 
-            if (Texture_ref[tex.image] === undefined) {
-                texObj = new Texture(tex.image, GLCore.default_filter, deferred_bin, meshUrl);
-            } else {
-                texObj = Textures_obj[Texture_ref[tex.image]];
+            if (!parsed) {
+              if (Texture_ref[tex.image] === undefined) {
+                  texObj = new Texture(tex.image, GLCore.default_filter, deferred_bin, meshUrl);
+              } else {
+                  texObj = Textures_obj[Texture_ref[tex.image]];
+              }
             }
-
+            else {
+              texObj = new DeferredLoadTexture(tex.image, GLCore.default_filter);
+            } //if
             newMaterial.setTexture(texObj, tex.type);
         }
 
@@ -11723,7 +11896,7 @@ function cubicvr_loadCollada(meshUrl, prefix, deferred_bin) {
             newObj.triangulateQuads();
             newObj.compile();
         } else {
-            deferred_bin.addMesh(meshUrl, meshUrl + ":" + meshId, newObj);
+            deferred_bin.addMesh(meshUrl, meshUrl + ":" + meshData.id, newObj);
         }
 
         meshRef[meshData.id] = newObj;
@@ -13053,7 +13226,8 @@ var extend = {
   setSoftShadows: GLCore.setSoftShadows,
   Worker: CubicVR_Worker,
   Layout: Layout,
-  View: View
+  View: View,
+  ResourcePool: ResourcePool,
 };
 
 for (var ext in extend) {
