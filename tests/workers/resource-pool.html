@@ -17,10 +17,10 @@
           var scene = new CubicVR.Scene(canvas.width, canvas.height, 80,0.1,150.0);
           var pool = new CubicVR.ResourcePool();
 
-          pool.loadSceneObject({
+          pool.createSceneObjectFromMesh({
             scene: scene,
-            mesh: 'tests/workers/collada_test.dae',
-            object: 'Sphere-V000',
+            mesh: 'tests/workers/kraddy_intro_ff_logo_3d2.dae',
+            object: 'Plane-V000',
             options: {
               position: [0, 1, 0],
             },

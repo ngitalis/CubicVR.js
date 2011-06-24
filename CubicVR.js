@@ -1236,7 +1236,17 @@ catch (e) {
       } //if
     };
 
-    this.loadSceneObject = function (settings) {
+    function prepareMesh = function (mesh) {
+      var newMesh = new Mesh();
+      for (var prop in mesh) {
+        if (mesh.hasOwnProperty(prop)) {
+          newMesh[prop] = mesh[prop];
+        } //if
+      } //for
+      return newMesh();
+    } //prepareMesh
+
+    this.createSceneObjectFromMesh = function (settings) {
       var scene = settings.scene,
           mesh = settings.mesh,
           meshObject = settings.object,
@@ -1247,8 +1257,9 @@ catch (e) {
         parsed: function () {
           if (meshObject) {
             manager.getSceneObject(meshObject, function (mesh) {
-              var sceneObject = new SceneObject(mesh);
-              scene.bindSceneObject(sceneObject);
+              //var sceneObject = new SceneObject(mesh);
+              //scene.bindSceneObject(sceneObject);
+              console.log(prepareMesh(mesh));
             });
           } //if
         },
