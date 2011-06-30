@@ -1236,20 +1236,20 @@ catch (e) {
       } //if
     };
 
-    function prepareMesh = function (mesh) {
-      var newMesh = new Mesh();
-      for (var prop in mesh) {
-        if (mesh.hasOwnProperty(prop)) {
-          newMesh[prop] = mesh[prop];
+    function prepareObject (object, templateObject) {
+      for (var prop in object) {
+        if (object.hasOwnProperty(prop)) {
+          templateObject[prop] = object[prop];
         } //if
       } //for
-      return newMesh();
+      return templateObject;
     } //prepareMesh
 
     this.createSceneObjectFromMesh = function (settings) {
       var scene = settings.scene,
           mesh = settings.mesh,
           meshObject = settings.object,
+          assetBase = settings.assetBase || "",
           options = settings.options;
 
       var manager = that.createSceneFileManager({
@@ -1257,9 +1257,17 @@ catch (e) {
         parsed: function () {
           if (meshObject) {
             manager.getSceneObject(meshObject, function (mesh) {
-              //var sceneObject = new SceneObject(mesh);
-              //scene.bindSceneObject(sceneObject);
-              console.log(prepareMesh(mesh));
+              var newMesh = prepareObject(mesh, new Mesh());
+              for (var i=0, li=newMesh.materials.length; i<li; ++i) {
+                var mat = prepareObject(newMesh.materials[i], new Material());
+                for (var j=0, lj=mat.textures.length; j<lj; ++j) {
+                  var tex = mat.textures[i];
+                  mat.textures[i] = new Texture(assetBase + tex.img_path, tex.filter_type);
+                } //for
+                newMesh.materials[i] = mat;
+              } //for
+              var sceneObject = new SceneObject(newMesh);
+              scene.bindSceneObject(sceneObject);
             });
           } //if
         },
