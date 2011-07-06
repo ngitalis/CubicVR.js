@@ -53,14 +53,8 @@ CubicVR.RegisterModule("Scene", function (base) {
 
         this.drawn_this_frame = false;
 
-        this.lposition = [0, 0, 0];
-        this.lrotation = [0, 0, 0];
-        this.lscale = [0, 0, 0];
-
         this.lMatrix = mat4.identity();
         this.tMatrix = mat4.identity();
-
-        this.dirty = true;
 
         this.aabb = [];
 
@@ -80,9 +74,88 @@ CubicVR.RegisterModule("Scene", function (base) {
 
         this.dynamic_lights = [];
         this.static_lights = [];
+
+        this._dirtyAABB = true;
+
+        this._position = {
+          vector:  [0, 0, 0],
+          dirty: false,
+          get x() { return this.vector[0]; },
+          get y() { return this.vector[1]; },
+          get z() { return this.vector[2]; },
+          set x(v) { this.vector[0] = v; this.dirty = true; },
+          set y(v) { this.vector[1] = v; this.dirty = true; },
+          set z(v) { this.vector[2] = v; this.dirty = true; },
+        };
+
+        this._rotation = {
+          vector:  [0, 0, 0],
+          dirty: true,
+          get x() { return this.vector[0]; },
+          get y() { return this.vector[1]; },
+          get z() { return this.vector[2]; },
+          set x(v) { this.vector[0] = v; this.dirty = true; },
+          set y(v) { this.vector[1] = v; this.dirty = true; },
+          set z(v) { this.vector[2] = v; this.dirty = true; },
+        };
+
+        this._scale = {
+          vector:  [1, 1, 1],
+          dirty: true,
+          get x() { return this.vector[0]; },
+          get y() { return this.vector[1]; },
+          get z() { return this.vector[2]; },
+          set x(v) { this.vector[0] = v; this.dirty = true; },
+          set y(v) { this.vector[1] = v; this.dirty = true; },
+          set z(v) { this.vector[2] = v; this.dirty = true; },
+        };
+
+        this.__defineSetter__("position", function (v) {
+          this._position.x = v[0];
+          this._position.y = v[1];
+          this._position.z = v[2];
+        });
+
+        this.__defineSetter__("rotation", function (v) {
+          this._rotation.x = v[0];
+          this._rotation.y = v[1];
+          this._rotation.z = v[2];
+        });
+
+        this.__defineSetter__("scale", function (v) {
+          this._scale.x = v[0];
+          this._scale.y = v[1];
+          this._scale.z = v[2];
+        });
+
+        this.__defineSetter__("dirty", function (v) {
+          this._position.dirty = v;
+          this._rotation.dirty = v;
+          this._scale.dirty = v;
+        });
+
+        this.__defineGetter__("dirty", function () {
+          return this._position.dirty || this._rotation.dirty || this._scale.dirty;
+        });
+
+        this.__defineGetter__("position", function () {
+          return this._position;
+        });
+
+        this.__defineGetter__("rotation", function () {
+          return this._rotation;
+        });
+
+        this.__defineGetter__("scale", function () {
+          return this._scale;
+        });
+
+
     }
 
     SceneObject.prototype = {
+
+
         setMorphSource: function (idx) {
             this.morphSource = idx;
         },
@@ -109,7 +182,7 @@ CubicVR.RegisterModule("Scene", function (base) {
 
         doTransform: function (mat) {
             var vec3 = CubicVR.vec3;
-            if (!vec3.equal(this.lposition, this.position) || !vec3.equal(this.lrotation, this.rotation) || !vec3.equal(this.lscale, this.scale) || (mat !== undef)) {
+            if (this.dirty || (mat !== undef)) {
 
                 if (mat !== undef) {
                   this.tMatrix = mat.slice(0);
@@ -118,25 +191,16 @@ CubicVR.RegisterModule("Scene", function (base) {
                 }
 
                 mat4.identity(this.lMatrix);
-                mat4.translate(this.position[0],this.position[1],this.position[2],this.lMatrix);
-                mat4.rotate(this.rotation[0],this.rotation[1],this.rotation[2],this.lMatrix);
+                mat4.translate(this._position.vector[0],this._position.vector[1],this._position.vector[2],this.lMatrix);
+                mat4.rotate(this._rotation.vector[0],this._rotation.vector[1],this._rotation.vector[2],this.lMatrix);
 
-                if (!(this.scale[0] === this.scale[1] === this.scale[2] === 1)) {
-                  mat4.scale(this.scale[0],this.scale[1],this.scale[2],this.lMatrix);                  
+                if (!(this._scale[0] === this._scale[1] === this._scale[2] === 1)) {
+                  mat4.scale(this._scale.vector[0],this._scale.vector[1],this._scale.vector[2],this.lMatrix);
                 }
 
                 mat4.multiply(this.tMatrix.slice(0),this.lMatrix,this.tMatrix);
 
-                this.lposition[0] = this.position[0];
-                this.lposition[1] = this.position[1];
-                this.lposition[2] = this.position[2];
-                this.lrotation[0] = this.rotation[0];
-                this.lrotation[1] = this.rotation[1];
-                this.lrotation[2] = this.rotation[2];
-                this.lscale[0] = this.scale[0];
-                this.lscale[1] = this.scale[1];
-                this.lscale[2] = this.scale[2];
-                this.dirty = true;
+                this._dirtyAABB = true;
             }
         },
 
@@ -204,7 +268,7 @@ CubicVR.RegisterModule("Scene", function (base) {
         getAABB: function () {
             var mat4 = CubicVR.mat4;
             var vec3 = CubicVR.vec3;
-            if (this.dirty) {
+            if (this._dirtyAABB) {
                 var p = new Array(8);
 
                 this.doTransform();
@@ -214,7 +278,7 @@ CubicVR.RegisterModule("Scene", function (base) {
 
                 if (this.obj !== null) {
                     if (this.obj.bb === null) {
-                        this.aabb = [vec3.add([-1, -1, -1], this.position), vec3.add([1, 1, 1], this.position)];
+                        this.aabb = [vec3.add([-1, -1, -1], this._position), vec3.add([1, 1, 1], this._position)];
                         return this.aabb;
                     }
 
@@ -228,7 +292,7 @@ CubicVR.RegisterModule("Scene", function (base) {
                     // 
                     // if (this.obj.bb.length===0)
                     // {
-                    this.aabb = [vec3.add([-1, -1, -1], this.position), vec3.add([1, 1, 1], this.position)];
+                    this.aabb = [vec3.add([-1, -1, -1], this._position), vec3.add([1, 1, 1], this._position)];
                     return this.aabb;
                     // }
                 }
@@ -290,7 +354,7 @@ CubicVR.RegisterModule("Scene", function (base) {
                 this.aabb[0] = aabbMin;
                 this.aabb[1] = aabbMax;
 
-                this.dirty = false;
+                this._dirtyAABB = false;
             }
 
             return this.aabb;

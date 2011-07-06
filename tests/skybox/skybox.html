@@ -43,7 +43,7 @@
         var num_boxes = 300;
         for (var i = 0; i < num_boxes; ++i) {
           var box_material = new CubicVR.Material();
-          box_material.color = [rand(0,0.1), rand(0,0.1), rand(0,0.1)];
+          box_material.color = [rand(0.3,0.6), rand(0.3,0.6), rand(0.3,0.6)];
           var box_object = new CubicVR.Mesh();
           CubicVR.genBoxObject(box_object, rand(.5, 10), box_material);
           box_object.calcNormals();
@@ -156,12 +156,10 @@
         scene.render();
 
         for (var i=0; i<scene.sceneObjects.length; ++i) {
-          scene.sceneObjects[i].rotation[0] += 15/i;
-          scene.sceneObjects[i].rotation[1] += 15/i;
-          scene.sceneObjects[i].rotation[2] += 15/i;
-          scene.sceneObjects[i].scale[0] = Math.sin(frames/i);
-          scene.sceneObjects[i].scale[1] = -Math.cos(frames/i);
-          scene.sceneObjects[i].scale[2] = -Math.cos(frames/i);
+          scene.sceneObjects[i].rotation.x += .1;
+          scene.sceneObjects[i].rotation.y += .2;
+          scene.sceneObjects[i].rotation.z += .3;
+          scene.sceneObjects[i].scale = [Math.sin(frames/10+i), Math.sin(frames/10+i), Math.sin(frames/10+i)];
         } //for
 
         ++frames;
