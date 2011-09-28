@@ -1,0 +1,19 @@
+{
+    "testSuite": [{
+        "dependancyURL": [
+	"dummy.js"
+        ],
+        "test": [{
+            "name": "cubetest",
+            "note": "Lets see if this works",
+            "tag": "CubicVR",
+            "firstCanvas" : {
+                "src" : { "url" : "resources/render/cube.png", "type" : "image" }
+            },
+            "secondCanvas" : {
+                "src" : { "url" : "resources/render/cube.js", "type" : "script" },
+                "run": "renderCube"
+            }
+        }]
+    }]
+} 

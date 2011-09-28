@@ -1,0 +1,57 @@
+﻿<!doctype html>
+<html>
+  <head>
+    <title>Sundae</title>
+    <script type='text/javascript' src='sundae.js' ></script>
+  </head>
+  <body>
+    <h1>Sundae Ref Test Runner</h1>
+    <h3>Settings</h3>
+    <div id='setup'>
+      <table><tr>
+        <td>Run Tests:</td>
+        <td><select id='type'/></td>
+      </tr><tr>
+        <td>Tolerance:</td>
+        <td><input type='text' size='2' id='epsilon' value='5'/>%</td>
+      </tr><tr>
+        <td>Blur Radius:</td>
+        <td><input type='text' size='2' id='sigma' value='2'/>px</td>
+      </tr></table>
+    </div>
+    <script src='../../CubicVR.js' type='text/javascript'></script>
+    <script type='text/javascript'>
+            var d = document;
+            //Setting dropdownlist
+            var t = d.getElementById('type');
+            var i, opt, tags = sundae.getTestTags(), len = tags.length;
+            for (i = 0; i < len; i++) {
+                opt = d.createElement('option');
+                opt.text = opt.value = tags[i];
+                t.options.add(opt);
+            }
+            //Creating start button
+            var b = createButton(d.body, 'Begin Tests', beginTester);
+            createButton(d.body, 'Hide All', sundae.eventHideAll);
+            createButton(d.body, 'Show All', sundae.eventShowAll);
+            createButton(d.body, 'Show Passes', sundae.eventShowPasses);
+            createButton(d.body, 'Show Fails', sundae.eventShowFails);
+            function beginTester() {
+                //Optional Global Setters
+                sundae.setBlurRadius(d.getElementById('sigma').value);
+                sundae.setTolerance(d.getElementById('epsilon').value);
+                sundae.setTestTag(d.getElementById('type').value);
+                //Start tester
+                sundae.init();
+                b.disabled = true;
+            }
+            function createButton(parent, text, callback) {
+                var b = window.document.createElement('button');
+                b.onclick = callback;
+                b.innerHTML = text;
+                parent.appendChild(b);
+                return b;
+            }
+    </script>
+  </body>
+</html>
