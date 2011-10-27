@@ -394,6 +394,7 @@ var SundaeTestsFile = 'tests.json';
         }
         if (test.secondCanvas.src) {
             sourceLoader(test.secondCanvas, b, function () {
+                alert("hax");
                 whenDone('second');
             });
         }

@@ -14,6 +14,18 @@
                 "src" : { "url" : "resources/render/cube.js", "type" : "script" },
                 "run": "renderCube"
             }
+        },
+        {
+            "name": "cubetest2",
+            "note": "FAIL",
+            "tag": "CubicVR",
+            "firstCanvas" : {
+                "src" : { "url" : "resources/render/cube2.png", "type" : "image" }
+            },
+            "secondCanvas" : {
+                "src" : { "url" : "resources/render/cube.js", "type" : "script" },
+                "run": "renderCube"
+            }
         }]
     }]
 } 

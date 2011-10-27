@@ -1,0 +1,108 @@
+﻿<!doctype html>
+<html>
+  <head>
+    <title>bleh</title>
+    <script type='text/javascript' src='sundae.js' ></script>
+  </head>
+  <body>
+    <h1>Test Page</h1>
+    <div id="tester"> </div>
+    <script src='CubicVR.js' type='text/javascript'></script>
+    <script>
+    // render a cube function.
+    function test(canvas, callback) {
+	    var gl = CubicVR.init(canvas.id);
+
+	    if (!gl) {
+		alert("Sorry, no WebGL support.");
+		return;
+	    };
+
+	    // Create a camera, position at 1,1,1 and target at 0,0,0
+	    var camera = new CubicVR.Camera(canvas.width,canvas.height,60);
+	    camera.position = [1,1,1];
+	    camera.lookat([0,0,0]);
+
+	    // Create a material for the mesh
+	    var boxMaterial = new CubicVR.Material({
+		textures: {
+		    color: new CubicVR.Texture("samples/images/6583-diffuse.jpg")
+		}
+	    });
+
+	    // Add a box to mesh, size 1.0, apply material and UV parameters
+	    var boxMesh = CubicVR.primitives.box({
+		size: 1.0,
+		material: boxMaterial,
+		uvmapper: {
+		    projectionMode: CubicVR.enums.uv.projection.CUBIC,
+		    scale: [1, 1, 1]
+		}
+	    });
+
+	    // triangulate and buffer object to GPU, remove unused data
+	    boxMesh.triangulateQuads().compile().clean();
+
+	    // Add our camera to the window resize list
+	    CubicVR.addResizeable(camera);
+
+	    CubicVR.MainLoop(function(timer, gl) {CubicVR.renderObject(boxMesh, camera, CubicVR.IdentityMatrix);});
+            
+            //gl.flush();
+            //gl.finish();
+	    callback();
+   }
+
+   var canvasFrame = document.getElementById('tester');
+   // get rendering canvas and context
+   var r = window.document.createElement('canvas');
+   var rCtx = r.getContext("experimental-webgl", {preserveDrawingBuffer: true});
+   r.id = "render";
+   r.width = 300;
+   r.height = 300;
+   canvasFrame.appendChild(r);
+
+   // get the png canvas and context
+   var p = window.document.createElement('canvas');
+   var pCtx = p.getContext("2d");
+   p.id = "pngImage";
+   p.width = 300;
+   p.height = 300;
+   canvasFrame.appendChild(p);
+
+   // run code.
+   test(r, function(){});
+
+   // 1. get data url and write to canvas B
+   //var data = r.toDataURL("image/png");
+   //var img = new Image();
+   //img.src = data;
+   //pCtx.drawImage(img, 0, 0);
+   // in case you want to try pasting the url in a new window
+   //alert(data);
+
+   // 2. alternative way.
+   //pCtx.drawImage(r, 0, 0);
+   
+   // 3. other alternate way.
+function makePNG() {
+   var image = pCtx.createImageData(p.width, p.height);
+   arr = new Uint8Array(r.width * r.height * 4);
+   rCtx.readPixels(0, 0, r.width, r.height, rCtx.RGBA, rCtx.UNSIGNED_BYTE, arr);
+      for (var y = 0; y < p.height; y++){
+        for (var x = 0; x < p.width; x++){
+          var index = (y * p.width + x) * 4;
+          var index2 = ((p.height-1-y) * p.width + x) * 4;
+          for(var z = 0; z < 4; z++){
+            image.data[index2 + z] = arr[index + z];
+          }
+        }
+      }
+   pCtx.putImageData(image, 0, 0);   
+}
+alert("what?!!?!?");
+makePNG();
+   //setTimeout("makePNG()", 500);
+</script>
+  </body>
+</html>
