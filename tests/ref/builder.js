@@ -1,7 +1,6 @@
-function runBuilder () {
+function createCanvas () {
    var canvasFrame = document.getElementById('render-frame'),
-       pngFrame = document.getElementById('png-frame'),
-       code = document.getElementById('code');
+       pngFrame = document.getElementById('png-frame');
 
    // get rendering canvas and context
    var r = window.document.createElement('canvas');
@@ -18,17 +17,24 @@ function runBuilder () {
    p.width = 300;
    p.height = 300;
    pngFrame.appendChild(p);
+}
+
+function makeScreen () {
+   var render = document.getElementById('render'),
+   png = document.getElementById('pngImage'),
+   pCtx = png.getContext("2d");
+
+   pCtx.drawImage(render, 0, 0);
+}
+
+function runBuilder () {
+   var render = document.getElementById('render'),
+       png = document.getElementById('pngImage'),
+       code = document.getElementById('code');
 
    // run code.
    eval(code.value);	
-   test(r, function(){});
+   test(render, function () {});
 
-   alert("IT WORKS");
-   pCtx.drawImage(r, 0, 0);
-   // get data url and display/draw.
-   //var data = r.toDataURL("image/png");
-   //var img = new Image();
-   //img.src = data;
-   //pCtx.drawImage(img, 0, 0);
-
+   setTimeout("makeScreen()", 500);
 }

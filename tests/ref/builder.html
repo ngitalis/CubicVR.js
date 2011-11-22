@@ -7,12 +7,14 @@
   <body onload="document.getElementById('code').focus()">
     <script src='../../CubicVR.js' type='text/javascript'></script>
     <script src='builder.js' type='text/javascript'></script>
+
     <h1>Ref Test Builder</h1>
 
     <h2>CubicVR Code</h2>
     <textarea rows="20" cols="80" id="code"></textarea>
     <div>
       <br> <input onclick="runBuilder()" type="button" value="Run"></input>
+	   <input onclick="makeScreen()" type="button" value="Screenshot"></input>
     </div>
 
     <h2>Render</h2>
@@ -23,5 +25,8 @@
       <div id="png-frame">
       </div>
 
+    <script>
+    createCanvas();
+    </script>
   </BODY>
 </HTML>
